@@ -48,7 +48,7 @@ internal class NeuralNet
 
     private void Train()
     {
-        Console.WriteLine("Begining Training...\n");
+        Console.WriteLine("Beginning Training...\n");
         foreach (DataSet dataSet in _trainingData)
         {
             _currentDataSet = dataSet;
@@ -101,7 +101,7 @@ internal class NeuralNet
         List<Neuron> layer = new();
         for (int i = 0; i < layerSize; i++)
         {
-            Neuron neuron = new(GetRandomInRange(3, -3), RandomizeWeights(previousInputSize));
+            Neuron neuron = new(GetRandomInRange(3.0, -3.0), RandomizeWeights(previousInputSize));
             layer.Add(neuron);
         }
         _layers.Add(layer);
@@ -211,7 +211,7 @@ internal class NeuralNet
         {
             throw new RangeBoundException($"Upper range param: {upper} was not greater than lower range param: {lower}");
         }
-        return (_rnd.NextDouble() * (upper - lower)) - lower;
+        return (_rnd.NextDouble() * (upper - lower)) + lower;
     }
 
     private void RandomizeData(List<DataSet> data)
