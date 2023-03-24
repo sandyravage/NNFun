@@ -200,12 +200,12 @@ internal class NeuralNet
         List<double> weights = new();
         for (int i = 0; i < layerSize; i++)
         {
-            weights.Add(GetRandomInRange(1, -1));
+            weights.Add(GetRandomInRange(0.01, -0.01));
         }
         return weights;
     }
 
-    private static double GetRandomInRange(int upper, int lower)
+    private static double GetRandomInRange(double upper, double lower)
     {
         if (upper < lower)
         {
