@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using System.Runtime.Serialization.Formatters;
 
 namespace NNFun;
 
@@ -48,7 +49,7 @@ internal class NeuralNet
 
     private void Train()
     {
-        Console.WriteLine("Begining Training...\n");
+        Console.WriteLine("Beginning Training...\n");
         foreach (DataSet dataSet in _trainingData)
         {
             _currentDataSet = dataSet;
@@ -93,7 +94,7 @@ internal class NeuralNet
             int previousInputSize = i == 0 ? _trainingData.First().Data.Count : _layers.Last().Count;
             CreateLayer(_hiddenLayers[i], previousInputSize);
         }
-        CreateLayer(_trainingData.First().Targets.Count, _layers.Last().Count);  
+        CreateLayer(_trainingData.First().Targets.Count, _layers.Last().Count);
     }
 
     private void CreateLayer(int layerSize, int previousInputSize)
@@ -109,7 +110,7 @@ internal class NeuralNet
 
     private void ForwardProp()
     {
-        for (int i = 0; i < _layers.Count; i++)
+        for (int i = 0; i < _layers.Count - 1; i++)
         {
             if(i == 0)
             {
@@ -139,11 +140,11 @@ internal class NeuralNet
                     for (int k = 0; k < neuron.Weights.Count; k++)
                     {
                         double weightDelta = CalculateDelta(previousOutputs[k], neuron.Gradient);
-                        neuron.Weights[k] = weightDelta + CalculateMomentum(neuron.PreviousWeightDeltas[k]);
+                        neuron.Weights[k] += weightDelta + CalculateMomentum(neuron.PreviousWeightDeltas[k]);
                         neuron.PreviousWeightDeltas[k] = weightDelta;
                     }
                     double biasDelta = CalculateDelta(1, neuron.Gradient);
-                    neuron.Bias = biasDelta + CalculateMomentum(neuron.PreviousBiasDelta);
+                    neuron.Bias += biasDelta + CalculateMomentum(neuron.PreviousBiasDelta);
                     neuron.PreviousBiasDelta = biasDelta;
                 }
             }
@@ -158,11 +159,11 @@ internal class NeuralNet
                     for (int k = 0; k < neuron.Weights.Count; k++)
                     {
                         double weightDelta = CalculateDelta(previousOutputs[k], neuron.Gradient);
-                        neuron.Weights[k] = weightDelta + CalculateMomentum(neuron.PreviousWeightDeltas[k]);
+                        neuron.Weights[k] += weightDelta + CalculateMomentum(neuron.PreviousWeightDeltas[k]);
                         neuron.PreviousWeightDeltas[k] = weightDelta;
                     }
                     double biasDelta = CalculateDelta(1, neuron.Gradient);
-                    neuron.Bias = biasDelta + CalculateMomentum(neuron.PreviousBiasDelta);
+                    neuron.Bias += biasDelta + CalculateMomentum(neuron.PreviousBiasDelta);
                     neuron.PreviousBiasDelta = biasDelta;
                 }
             }
@@ -211,7 +212,7 @@ internal class NeuralNet
         {
             throw new RangeBoundException($"Upper range param: {upper} was not greater than lower range param: {lower}");
         }
-        return (_rnd.NextDouble() * (upper - lower)) - lower;
+        return (_rnd.NextDouble() * (upper - lower)) + lower;
     }
 
     private void RandomizeData(List<DataSet> data)
