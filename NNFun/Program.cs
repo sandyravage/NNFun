@@ -10,7 +10,7 @@ List<DataSet> data = MnistReader.GetData();
 NeuralNetConfig config = new(
     hiddenLayers,
     data,
-    new ReLU(),
+    new Sigmoid(),
     new SoftMax()
 );
 

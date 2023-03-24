@@ -1,7 +1,4 @@
-﻿using System.Linq;
-using System.Reflection.Emit;
-
-namespace NNFun;
+﻿namespace NNFun;
 
 internal static class MnistReader
 {

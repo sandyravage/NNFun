@@ -1,12 +1,8 @@
-﻿using System.Data;
-using System.Runtime.Serialization.Formatters;
-
-namespace NNFun;
+﻿namespace NNFun;
 
 internal class NeuralNet
 {
     private readonly List<int> _hiddenLayers;
-    private readonly List<List<Neuron>> _layers = new();
     private readonly double _alpha;
     private readonly double _p;
     private readonly IHiddenFunction _hiddenFunction;
@@ -14,11 +10,16 @@ internal class NeuralNet
 
     private List<DataSet> _trainingData = new();
     private List<DataSet> _testingData = new();
+    private readonly List<List<Neuron>> _layers = new();
     private DataSet _currentDataSet;
     private static readonly Random _rnd = new();
 
+    private int _iteration = 0;
+    private readonly NeuralNetConfig _config;
+
     internal NeuralNet(NeuralNetConfig config)
     {
+        _config = config;
         _hiddenLayers = config.HiddenLayers;
         RandomizeData(config.Data);
         _hiddenFunction = config.HiddenFunction;
@@ -52,6 +53,7 @@ internal class NeuralNet
         Console.WriteLine("Beginning Training...\n");
         foreach (DataSet dataSet in _trainingData)
         {
+            _iteration++;
             _currentDataSet = dataSet;
             ForwardProp();
             BackwardProp();
@@ -62,13 +64,15 @@ internal class NeuralNet
     private void LogOutcome()
     {
         List<double> outcomes = _layers.Last().Select(x => x.Output).ToList();
-        Console.WriteLine($"Network outcome: {outcomes.IndexOf(outcomes.Max())}");
-        double errorRate = 0.0;
+        var indexOutput = outcomes.IndexOf(outcomes.Max());
+        Console.WriteLine($"Network outcome: {outcomes.IndexOf(outcomes.Max())}. " +
+            $"Actual: {_currentDataSet.Targets.IndexOf(_currentDataSet.Targets.Max())}");
+        double errorSum = 0.0;
         for (int i = 0; i < outcomes.Count; i++)
         {
-            errorRate += Math.Abs(_currentDataSet.Targets[i] - outcomes[i]);
+            errorSum += Math.Abs(_currentDataSet.Targets[i] - outcomes[i]);
         }
-        Console.WriteLine($"Error rate: {errorRate}\n");
+        Console.WriteLine($"Confidence: {Math.Round(Math.Abs((_currentDataSet.Targets[indexOutput] - outcomes[indexOutput]) / errorSum) * 100, 2) : 0.00}%\n");
     }
 
     private void ValidateData()
@@ -102,7 +106,7 @@ internal class NeuralNet
         List<Neuron> layer = new();
         for (int i = 0; i < layerSize; i++)
         {
-            Neuron neuron = new(GetRandomInRange(3.0, -3.0), RandomizeWeights(previousInputSize));
+            Neuron neuron = new(GetRandomInRange(_config.BiasUpperLimit, _config.BiasLowerLimit), RandomizeWeights(previousInputSize));
             layer.Add(neuron);
         }
         _layers.Add(layer);
@@ -122,50 +126,42 @@ internal class NeuralNet
             }
         }
         List<double> finalOutput = _layers[^2].Select(y => y.Output).ToList();
-        _layers[^1].ForEach(x => x.Output = _outcomeFunction.Activation(finalOutput, x.ComputeOutput(finalOutput)));
+        _layers[^1].ForEach(x => x.Output = x.ComputeOutput(finalOutput));
+        _layers[^1].ForEach(x => x.Output = _outcomeFunction.Activation(_layers[^1].Select(y => y.Output), x.Output));
     }
 
     private void BackwardProp()
     {
         for (int i = _layers.Count - 1; i > -1; i--)
         {
-            List<double> previousOutputs = i == 0 ? _currentDataSet.Data :_layers[i - 1].Select(x => x.Output).ToList();
-
-            if (i == _layers.Count - 1)
+            for (int j = 0; j < _layers[i].Count; j++)
             {
-                for (int j = 0; j < _layers[i].Count; j++)
+                Neuron neuron = _layers[i][j];
+                if (i == _layers.Count - 1)
                 {
-                    Neuron neuron = _layers[i][j];
                     neuron.Gradient = CalculateOutcomeGradient(neuron.Output, _currentDataSet.Targets[j]);
-                    for (int k = 0; k < neuron.Weights.Count; k++)
-                    {
-                        double weightDelta = CalculateDelta(previousOutputs[k], neuron.Gradient);
-                        neuron.Weights[k] += weightDelta + CalculateMomentum(neuron.PreviousWeightDeltas[k]);
-                        neuron.PreviousWeightDeltas[k] = weightDelta;
-                    }
-                    double biasDelta = CalculateDelta(1, neuron.Gradient);
-                    neuron.Bias += biasDelta + CalculateMomentum(neuron.PreviousBiasDelta);
-                    neuron.PreviousBiasDelta = biasDelta;
                 }
-            }
-            else
-            {
-                for (int j = 0; j < _layers[i].Count; j++)
+                else
                 {
-                    List<double> previousWeights = _layers[i + 1].Select(x => x.Weights[j]).ToList();
-                    List<double> previousGradients = _layers[i + 1].Select(x => x.Gradient).ToList();
-                    Neuron neuron = _layers[i][j];
-                    neuron.Gradient = CalculateHiddenGradient(neuron.Output, previousGradients, previousWeights);
-                    for (int k = 0; k < neuron.Weights.Count; k++)
-                    {
-                        double weightDelta = CalculateDelta(previousOutputs[k], neuron.Gradient);
-                        neuron.Weights[k] += weightDelta + CalculateMomentum(neuron.PreviousWeightDeltas[k]);
-                        neuron.PreviousWeightDeltas[k] = weightDelta;
-                    }
-                    double biasDelta = CalculateDelta(1, neuron.Gradient);
-                    neuron.Bias += biasDelta + CalculateMomentum(neuron.PreviousBiasDelta);
-                    neuron.PreviousBiasDelta = biasDelta;
+                    List<double> downstreamWeights = _layers[i + 1].Select(x => x.Weights[j]).ToList();
+                    List<double> downnstreamGradients = _layers[i + 1].Select(x => x.Gradient).ToList();
+                    neuron.Gradient = CalculateHiddenGradient(neuron.Output, downnstreamGradients, downstreamWeights);
                 }
+                for (int k = 0; k < neuron.Weights.Count; k++)
+                {
+                    List<double> upstreamOutputs = i == 0 ? _currentDataSet.Data : _layers[i - 1].Select(x => x.Output).ToList();
+                    double weightDelta = CalculateDelta(upstreamOutputs[k], neuron.Gradient);
+                    var move = weightDelta + CalculateMomentum(neuron.PreviousWeightDeltas[k]);
+                    if(double.IsNaN(move))
+                    {
+                        Console.WriteLine("test");
+                    }
+                    neuron.Weights[k] += move;
+                    neuron.PreviousWeightDeltas[k] = weightDelta;
+                }
+                double biasDelta = CalculateDelta(1, neuron.Gradient);
+                neuron.Bias += biasDelta + CalculateMomentum(neuron.PreviousBiasDelta);
+                neuron.PreviousBiasDelta = biasDelta;
             }
         }
     }
@@ -185,23 +181,22 @@ internal class NeuralNet
         return _outcomeFunction.Derivative(outcome) * (desired - outcome);
     }
 
-    private double CalculateHiddenGradient(double outcome, List<double> previousGradients, List<double> previousWeights)
+    private double CalculateHiddenGradient(double outcome, List<double> downstreamGradients, List<double> downstreamWeights)
     {
         double sum = 0;
-        for (int i = 0; i < previousGradients.Count; i++)
+        for (int i = 0; i < downstreamGradients.Count; i++)
         {
-            sum += previousGradients[i] * previousWeights[i];
+            sum += downstreamGradients[i] * downstreamWeights[i];
         }
         return _hiddenFunction.Derivative(outcome) * sum;
     }
 
-    private static List<double> RandomizeWeights(int layerSize)
-    {
-        
+    private List<double> RandomizeWeights(int layerSize)
+    {  
         List<double> weights = new();
         for (int i = 0; i < layerSize; i++)
         {
-            weights.Add(GetRandomInRange(0.01, -0.01));
+            weights.Add(GetRandomInRange(_config.WeightUpperLimit, _config.WeightLowerLimit));
         }
         return weights;
     }
@@ -218,8 +213,8 @@ internal class NeuralNet
     private void RandomizeData(List<DataSet> data)
     {
         int quarterSetIndex = data.Count / 4;
-        _testingData = data.Take(quarterSetIndex).OrderBy(x => _rnd.Next()).ToList();
-        _trainingData = data.Skip(quarterSetIndex).OrderBy(x => _rnd.Next()).ToList();
+        _testingData = data.Take(quarterSetIndex).OrderBy(_ => _rnd.Next()).ToList();
+        _trainingData = data.Skip(quarterSetIndex).OrderBy(_ => _rnd.Next()).ToList();
     }
 }
 
@@ -249,6 +244,10 @@ internal class Neuron
         for (int i = 0; i < inputs.Count; i++)
         {
             product += Weights[i] * inputs[i];
+        }
+        if(double.IsNaN(product))
+        {
+            Console.WriteLine("wait");
         }
         return product + Bias;
     }
