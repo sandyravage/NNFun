@@ -2,12 +2,6 @@
 
 internal class NeuralNet
 {
-    private readonly List<int> _hiddenLayers;
-    private readonly double _alpha;
-    private readonly double _p;
-    private readonly IHiddenFunction _hiddenFunction;
-    private readonly IOutcomeFunction _outcomeFunction;
-
     private List<DataSet> _trainingData = new();
     private List<DataSet> _testingData = new();
     private readonly List<List<Neuron>> _layers = new();
@@ -20,21 +14,17 @@ internal class NeuralNet
     internal NeuralNet(NeuralNetConfig config)
     {
         _config = config;
-        _hiddenLayers = config.HiddenLayers;
         RandomizeData(config.Data);
-        _hiddenFunction = config.HiddenFunction;
-        _outcomeFunction = config.OutcomeFunction;
-        _alpha = config.DeltaCoefficient;
-        _p = config.MomentumCoefficient;
     }
 
     public void RunNeuralNet()
     {
-        Console.WriteLine("Beginning neural net run...\n");
+        Console.WriteLine("Beginning Neural Net run...\n");
         ValidateData();
         CreateNeurons();
         Train();
         Test();
+        Console.WriteLine("Run Complete");
     }
     
     private void Test()
@@ -42,9 +32,13 @@ internal class NeuralNet
         Console.WriteLine("Beginning Testing...\n");
         foreach (DataSet dataSet in _testingData)
         {
+            _iteration++;
             _currentDataSet = dataSet;
             ForwardProp();
-            LogOutcome();
+            if(_iteration % 500 == 0)
+            {
+                LogOutcome();
+            }
         }
     }
 
@@ -53,7 +47,6 @@ internal class NeuralNet
         Console.WriteLine("Beginning Training...\n");
         foreach (DataSet dataSet in _trainingData)
         {
-            _iteration++;
             _currentDataSet = dataSet;
             ForwardProp();
             BackwardProp();
@@ -93,10 +86,10 @@ internal class NeuralNet
 
     private void CreateNeurons()
     {
-        for (int i = 0; i < _hiddenLayers.Count; i++)
+        for (int i = 0; i < _config.HiddenLayers.Count; i++)
         {
             int previousInputSize = i == 0 ? _trainingData.First().Data.Count : _layers.Last().Count;
-            CreateLayer(_hiddenLayers[i], previousInputSize);
+            CreateLayer(_config.HiddenLayers[i], previousInputSize);
         }
         CreateLayer(_trainingData.First().Targets.Count, _layers.Last().Count);
     }
@@ -118,16 +111,16 @@ internal class NeuralNet
         {
             if(i == 0)
             {
-                _layers[i].ForEach(x => x.Output = _hiddenFunction.Activation(x.ComputeOutput(_currentDataSet.Data)));
+                _layers[i].ForEach(x => x.Output = _config.HiddenFunction.Activation(x.ComputeOutput(_currentDataSet.Data)));
             }
             else
             {
-                _layers[i].ForEach(x => x.Output = _hiddenFunction.Activation(x.ComputeOutput(_layers[i - 1].Select(y => y.Output).ToList())));
+                _layers[i].ForEach(x => x.Output = _config.HiddenFunction.Activation(x.ComputeOutput(_layers[i - 1].Select(y => y.Output).ToList())));
             }
         }
         List<double> finalOutput = _layers[^2].Select(y => y.Output).ToList();
         _layers[^1].ForEach(x => x.Output = x.ComputeOutput(finalOutput));
-        _layers[^1].ForEach(x => x.Output = _outcomeFunction.Activation(_layers[^1].Select(y => y.Output), x.Output));
+        _layers[^1].ForEach(x => x.Output = _config.OutcomeFunction.Activation(_layers[^1].Select(y => y.Output), x.Output));
     }
 
     private void BackwardProp()
@@ -152,10 +145,6 @@ internal class NeuralNet
                     List<double> upstreamOutputs = i == 0 ? _currentDataSet.Data : _layers[i - 1].Select(x => x.Output).ToList();
                     double weightDelta = CalculateDelta(upstreamOutputs[k], neuron.Gradient);
                     var move = weightDelta + CalculateMomentum(neuron.PreviousWeightDeltas[k]);
-                    if(double.IsNaN(move))
-                    {
-                        Console.WriteLine("test");
-                    }
                     neuron.Weights[k] += move;
                     neuron.PreviousWeightDeltas[k] = weightDelta;
                 }
@@ -168,17 +157,17 @@ internal class NeuralNet
 
     private double CalculateDelta(double previousOutput, double gradient)
     {
-        return _alpha * previousOutput * gradient;
+        return _config.DeltaCoefficient * previousOutput * gradient;
     }
 
     private double CalculateMomentum(double previousDelta)
     {
-        return _p * previousDelta;
+        return _config.MomentumCoefficient * previousDelta;
     }
 
     private double CalculateOutcomeGradient(double outcome, double desired)
     {
-        return _outcomeFunction.Derivative(outcome) * (desired - outcome);
+        return _config.OutcomeFunction.Derivative(outcome) * (desired - outcome);
     }
 
     private double CalculateHiddenGradient(double outcome, List<double> downstreamGradients, List<double> downstreamWeights)
@@ -188,7 +177,7 @@ internal class NeuralNet
         {
             sum += downstreamGradients[i] * downstreamWeights[i];
         }
-        return _hiddenFunction.Derivative(outcome) * sum;
+        return _config.HiddenFunction.Derivative(outcome) * sum;
     }
 
     private List<double> RandomizeWeights(int layerSize)
@@ -244,10 +233,6 @@ internal class Neuron
         for (int i = 0; i < inputs.Count; i++)
         {
             product += Weights[i] * inputs[i];
-        }
-        if(double.IsNaN(product))
-        {
-            Console.WriteLine("wait");
         }
         return product + Bias;
     }

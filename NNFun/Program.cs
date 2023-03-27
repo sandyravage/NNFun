@@ -17,5 +17,3 @@ NeuralNetConfig config = new(
 NeuralNet neuralNet = new(config);
 
 neuralNet.RunNeuralNet();
-
-Console.WriteLine("we did it");
